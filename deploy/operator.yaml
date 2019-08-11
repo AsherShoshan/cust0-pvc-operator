@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cust0-pvc-operator
+  namespace: cdi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: cust0-pvc-operator
+  template:
+    metadata:
+      labels:
+        name: cust0-pvc-operator
+    spec:
+      serviceAccountName: cust0-pvc-operator
+      containers:
+        - name: cust0-pvc-operator
+          image: docker.io/ashershoshan/cust0-pvc-operator:v0.0.3
+          command:
+          - cust0-pvc-operator
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+              #valueFrom:
+                #fieldRef:
+                  #fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "cust0-pvc-operator"
+
