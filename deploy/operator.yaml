@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cust0-pvc-operator
-  namespace: cdi
+  namespace: TARGET_NAMESPACE
 spec:
   replicas: 1
   selector:
