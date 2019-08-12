@@ -1,10 +1,9 @@
-package ctl
+package pvc
 
 import (
 	"context"
 	"math/rand"
-
-	//"time"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +20,9 @@ import (
 )
 
 var log = logf.Log.WithName("cust0-pvc-operator")
+
+var hostPathStorageClass = "kubevirt-hostpath-provisioner"
+var hostPathAnnotation = "kubevirt.io/provisionOnNode"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -46,16 +48,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	chck := func(obj runtime.Object) bool {
+		pvc := obj.DeepCopyObject().(*corev1.PersistentVolumeClaim)
+		return *pvc.Spec.StorageClassName == hostPathStorageClass
+	}
 	pred := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			pvc := e.Object.DeepCopyObject().(*corev1.PersistentVolumeClaim)
-			return *pvc.Spec.StorageClassName == "kubevirt-hostpath-provisioner"
+			return chck(e.Object)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			//pvco := e.ObjectOld.DeepCopyObject().(*corev1.PersistentVolumeClaim)
-			//pvcn := e.ObjectNew.DeepCopyObject().(*corev1.PersistentVolumeClaim)
-			//return *pvco.Spec.StorageClassName == "kubevirt-hostpath-provisioner" ||
-			//       *pvcn.Spec.StorageClassName == "kubevirt-hostpath-provisioner"   //when any change on chck(pvc)
+			//return chck(e.ObjectOld) || chck(e.ObjectNew)
 			return false
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
@@ -111,51 +113,62 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
-	if *pvc.Spec.StorageClassName != "kubevirt-hostpath-provisioner" {
+	// Only with this storageClass
+	if *pvc.Spec.StorageClassName != hostPathStorageClass {
 		return reconcile.Result{}, nil
 	}
 
-	if value, found := pvc.Annotations["kubevirt.io/provisionOnNode"]; found && value != "" {
+	// If already there is an annotation - exit
+	if value, found := pvc.Annotations[hostPathAnnotation]; found && value != "" {
 		return reconcile.Result{}, nil
 	}
 
-	nodelist := &corev1.NodeList{}
-	err = r.client.List(context.TODO(), &client.ListOptions{}, nodelist)
+	//build schedulable node name list
+	schedNodelist, err := r.buildSchedNodeList()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	var schedNodelist []string
-
-	for _, node := range nodelist.Items {
-
-		sched := true
-		for _, taint := range node.Spec.Taints {
-			if taint.Effect == "NoSchedule" {
-				sched = false
-				break
-			}
-		}
-		if sched {
-			schedNodelist = append(schedNodelist, node.Name)
-		}
-	}
-	//if no node available, return
+	//if no node available, requeue after 10Sec
 	if len(schedNodelist) < 1 {
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
 	}
+
 	//handle if empty
 	if pvc.Annotations == nil {
 		pvc.Annotations = make(map[string]string)
 	}
-	//pick up random node from schedNodelist, and annotate the PVC
+	//pick up random node from schedNodelist
 	nodeName := schedNodelist[rand.Intn(len(schedNodelist))]
-	reqLogger.Info("Annotate PVC kubevirt.io/provisionOnNode=" + nodeName)
-	pvc.Annotations["kubevirt.io/provisionOnNode"] = nodeName
+	// Annotate the PVC with the node
+	reqLogger.Info("Annotate PVC " + hostPathAnnotation + "=" + nodeName)
+	pvc.Annotations[hostPathAnnotation] = nodeName
 	if err = r.client.Update(context.TODO(), pvc); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *Reconciler) buildSchedNodeList() ([]string, error) {
+
+	var schedNodelist []string
+
+	nodelist := &corev1.NodeList{}
+	err := r.client.List(context.TODO(), &client.ListOptions{}, nodelist)
+	if err == nil {
+		for _, node := range nodelist.Items {
+			sched := true
+			for _, taint := range node.Spec.Taints {
+				if taint.Effect == "NoSchedule" {
+					sched = false
+					break
+				}
+			}
+			if sched {
+				schedNodelist = append(schedNodelist, node.Name)
+			}
+		}
+	}
+	return schedNodelist, err
 }
 

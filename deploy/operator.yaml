@@ -17,10 +17,11 @@ spec:
       serviceAccountName: cust0-pvc-operator
       containers:
         - name: cust0-pvc-operator
-          image: docker.io/ashershoshan/cust0-pvc-operator:v0.0.3
+          #image latest 12/8/19
+          image: docker.io/ashershoshan/cust0-pvc-operator@sha256:e83450310a991fdcd0ff8d5a59f6cf3c13447ef87ab4311a622f7b3c22c56c88
+          imagePullPolicy: IfNotPresent
           command:
           - cust0-pvc-operator
-          imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
               value: ""
