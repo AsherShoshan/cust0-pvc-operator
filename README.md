@@ -9,9 +9,9 @@ Installation
    "NAMESPACE" is traget namespace (!= default, !=kube-system)
 
 
-note: for Openshift 3.11, run this taint on masters
+note: for Openshift 3.11, before installation, run this taint once on masters:
 
-for node in $(oc get node -o name -l node-role.kubernetes.io/master="true"); do oc adm taint node $node node-role.kubernetes.io/master=:NoSchedule --overwrite ; done
+for node in $(oc get node -o name -l node-role.kubernetes.io/master); do oc adm taint node $node node-role.kubernetes.io/master=:NoSchedule ; done
 
 
 Uinstall
