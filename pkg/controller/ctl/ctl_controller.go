@@ -3,7 +3,8 @@ package ctl
 import (
 	"context"
 	"math/rand"
-	"time"
+
+	//"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -110,8 +111,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
-	if *pvc.Spec.StorageClassName != "kubevirt-hostpath-provisioner" ||
-		pvc.Annotations["kubevirt.io/provisionOnNode"] != "" {
+	if *pvc.Spec.StorageClassName != "kubevirt-hostpath-provisioner" {
+		return reconcile.Result{}, nil
+	}
+
+	if value, found := pvc.Annotations["kubevirt.io/provisionOnNode"]; found && value != "" {
 		return reconcile.Result{}, nil
 	}
 
@@ -136,13 +140,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 			schedNodelist = append(schedNodelist, node.Name)
 		}
 	}
-	//if no node available, reschedule in 5 sec
+	//if no node available, return
 	if len(schedNodelist) < 1 {
-		return reconcile.Result{RequeueAfter: time.Second * 5}, nil
+		return reconcile.Result{}, nil
+	}
+	//handle if empty
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string)
 	}
 	//pick up random node from schedNodelist, and annotate the PVC
-	pvc.Annotations["kubevirt.io/provisionOnNode"] = schedNodelist[rand.Intn(len(schedNodelist))]
-	reqLogger.Info("Annotate PVC kubevirt.io/provisionOnNode=" + pvc.Annotations["kubevirt.io/provisionOnNode"])
+	nodeName := schedNodelist[rand.Intn(len(schedNodelist))]
+	reqLogger.Info("Annotate PVC kubevirt.io/provisionOnNode=" + nodeName)
+	pvc.Annotations["kubevirt.io/provisionOnNode"] = nodeName
 	if err = r.client.Update(context.TODO(), pvc); err != nil {
 		return reconcile.Result{}, err
 	}
