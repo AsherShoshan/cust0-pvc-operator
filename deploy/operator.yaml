@@ -18,7 +18,9 @@ spec:
       containers:
         - name: cust0-pvc-operator
           #image latest 12/8/19
-          image: docker.io/ashershoshan/cust0-pvc-operator@sha256:e83450310a991fdcd0ff8d5a59f6cf3c13447ef87ab4311a622f7b3c22c56c88
+          #image: docker.io/ashershoshan/cust0-pvc-operator@sha256:e83450310a991fdcd0ff8d5a59f6cf3c13447ef87ab4311a622f7b3c22c56c88
+          #image v0.0.5 14/8/19
+          image: docker.io/ashershoshan/cust0-pvc-operator@sha256:8e452c57d634c59ef79bc16dae94a648ab133e1444b0d266d937fe8cb7100c89
           imagePullPolicy: IfNotPresent
           command:
           - cust0-pvc-operator
