@@ -1,5 +1,7 @@
 # cust0-pvc-operator
 
+Automatically annotate PVC's with node specific info, to support specific local-storage assignment requiremnts.
+
 
 Install
 -------
